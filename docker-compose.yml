@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://voice:voice@postgres:5432/voice_support
+      SECRET_KEY: ${SECRET_KEY:-local-compose-secret-change-me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: voice_support
+      POSTGRES_USER: voice
+      POSTGRES_PASSWORD: voice
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voice -d voice_support"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    profiles: ["redis"]
+    ports: ["6379:6379"]
+volumes:
+  postgres_data:
+
