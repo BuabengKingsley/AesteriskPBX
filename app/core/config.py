@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     otp_max_attempts: int = 3
     session_ttl_seconds: int = 900
     log_level: str = "INFO"
+    agent_api_key: str = "development-only-change-me"
+    tts_provider: str = "mock"
+    stt_provider: str = "mock"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

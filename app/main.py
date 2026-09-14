@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.api import accounts, auth, health, transactions
+from app.api import accounts, auth, conversations, health, transactions, voice
 from app.core.config import get_settings
 from app.database.base import Base
 from app.database.session import engine
@@ -24,6 +24,8 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(accounts.router)
 app.include_router(transactions.router)
+app.include_router(conversations.router)
+app.include_router(voice.router)
 
 
 @app.exception_handler(Exception)
