@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Account, Customer, SupportCase, Transaction
@@ -39,4 +40,22 @@ def temporarily_restrict_account(db: Session, *, customer: Customer, account: Ac
                  result="success", metadata={"account_id": account.id}, call_id=call_id)
     db.commit()
     db.refresh(case)
+    return case
+
+
+def lift_account_restriction(db: Session, *, customer: Customer, account: Account, resolution_note: str | None, call_id: str | None = None) -> SupportCase | None:
+    if account.status != "temporarily_restricted":
+        raise HTTPException(status_code=409, detail="Account is not currently restricted")
+    account.status = "active"
+    case = db.scalar(select(SupportCase).where(SupportCase.customer_id == customer.id, SupportCase.case_type == "account_restriction",
+                                               SupportCase.status == "open").order_by(SupportCase.created_at.desc()))
+    if case:
+        case.status = "resolved"
+        if resolution_note:
+            case.description = f"{case.description}\nResolution: {resolution_note}"
+    record_audit(db, customer_id=customer.id, event_type="account_restriction_lifted", action="lift_account_restriction",
+                result="success", metadata={"account_id": account.id}, call_id=call_id)
+    db.commit()
+    if case:
+        db.refresh(case)
     return case

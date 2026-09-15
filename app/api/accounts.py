@@ -8,9 +8,9 @@ from app.api.dependencies import current_customer, current_elevated_customer
 from app.database.session import get_db
 from app.models import Account, Customer
 from app.schemas.account import AccountSummary, BalanceResponse
-from app.schemas.case import TemporaryRestrictionRequest, TemporaryRestrictionResponse
+from app.schemas.case import LiftRestrictionRequest, LiftRestrictionResponse, TemporaryRestrictionRequest, TemporaryRestrictionResponse
 from app.services.audit_service import record_audit
-from app.services.case_service import temporarily_restrict_account
+from app.services.case_service import lift_account_restriction, temporarily_restrict_account
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -39,4 +39,15 @@ def restrict_account(account_id: int, payload: TemporaryRestrictionRequest,
         raise HTTPException(status_code=404, detail="Account not found")
     case = temporarily_restrict_account(db, customer=customer, account=account, reason=payload.reason)
     return TemporaryRestrictionResponse(account=account.account_number_masked, status=account.status, case_reference=case.case_reference)
+
+
+@router.post("/{account_id}/lift-restriction", response_model=LiftRestrictionResponse)
+def lift_restriction(account_id: int, payload: LiftRestrictionRequest,
+                     customer: Annotated[Customer, Depends(current_elevated_customer)], db: Annotated[Session, Depends(get_db)]):
+    account = db.scalar(select(Account).where(Account.id == account_id, Account.customer_id == customer.id))
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    case = lift_account_restriction(db, customer=customer, account=account, resolution_note=payload.resolution_note)
+    return LiftRestrictionResponse(account=account.account_number_masked, status=account.status,
+                                   case_reference=case.case_reference if case else None)
 

@@ -73,6 +73,7 @@ PostgreSQL is used by the Compose stack. Redis is reserved for the future sessio
 - `GET /accounts/me`
 - `GET /accounts/{account_id}/balance`
 - `POST /accounts/{account_id}/temporary-restriction` — requires elevated authentication and explicit `{"confirm": true}`
+- `POST /accounts/{account_id}/lift-restriction` — requires elevated authentication and explicit `{"confirm": true}`; resolves the related support case
 
 ### Transactions
 - `GET /accounts/{account_id}/transactions?limit=&start_date=&end_date=`
@@ -93,4 +94,4 @@ OTP and bearer token values are HMAC-SHA256 hashed at rest. Challenges expire, e
 
 ## Future work
 
-Real speech-to-text and text-to-speech integration (pending a decision between a hosted API and a custom-trained voice model), the Asterisk ARI/External Media telephony adapter (pending PBX access), Redis-backed session storage, rate limiting, an account un-restrict endpoint, multi-account-per-customer support in the conversation tools, and database migrations remain deliberately outside the current scope.
+Real speech-to-text and text-to-speech integration (pending a decision between a hosted API and a custom-trained voice model), the Asterisk ARI/External Media telephony adapter (pending PBX access), Redis-backed session storage, rate limiting, multi-account-per-customer support in the conversation tools, and database migrations remain deliberately outside the current scope.

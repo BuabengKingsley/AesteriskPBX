@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from app.database.session import SessionLocal
-from app.models import Account, Transaction
+from app.models import Account, SupportCase, Transaction
 
 
 def _first_transaction_reference(auth) -> str:
@@ -85,3 +85,46 @@ def test_step_up_start_returns_challenge_without_leaking_otp(client, auth):
     response = client.post("/auth/step-up/start", headers=auth["headers"])
     assert response.status_code == 201
     assert set(response.json()) == {"challenge_id", "expires_in_seconds"}
+
+
+def test_lift_restriction_requires_elevated_auth(client, auth):
+    response = client.post(f"/accounts/{auth['account_id']}/lift-restriction", json={"confirm": True}, headers=auth["headers"])
+    assert response.status_code == 403
+
+
+def test_lift_restriction_when_not_restricted_conflict(client, elevated_auth):
+    account_id = elevated_auth["account_id"]
+    response = client.post(f"/accounts/{account_id}/lift-restriction", json={"confirm": True}, headers=elevated_auth["headers"])
+    assert response.status_code == 409
+
+
+def test_lift_restriction_succeeds_and_resolves_case(client, elevated_auth):
+    account_id = elevated_auth["account_id"]
+    restrict = client.post(f"/accounts/{account_id}/temporary-restriction", json={"confirm": True}, headers=elevated_auth["headers"])
+    case_reference = restrict.json()["case_reference"]
+
+    response = client.post(f"/accounts/{account_id}/lift-restriction", json={"confirm": True, "resolution_note": "Confirmed with customer"},
+                           headers=elevated_auth["headers"])
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "active"
+    assert body["case_reference"] == case_reference
+
+    with SessionLocal() as db:
+        account = db.get(Account, account_id)
+        assert account.status == "active"
+        case = db.scalar(select(SupportCase).where(SupportCase.case_reference == case_reference))
+        assert case.status == "resolved"
+        assert "Confirmed with customer" in case.description
+
+
+def test_lift_restriction_missing_confirm_rejected(client, elevated_auth):
+    account_id = elevated_auth["account_id"]
+    client.post(f"/accounts/{account_id}/temporary-restriction", json={"confirm": True}, headers=elevated_auth["headers"])
+    response = client.post(f"/accounts/{account_id}/lift-restriction", json={}, headers=elevated_auth["headers"])
+    assert response.status_code == 422
+
+
+def test_lift_restriction_ownership_is_enforced(client, elevated_auth):
+    response = client.post("/accounts/2/lift-restriction", json={"confirm": True}, headers=elevated_auth["headers"])
+    assert response.status_code == 404

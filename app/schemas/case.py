@@ -36,3 +36,20 @@ class TemporaryRestrictionResponse(BaseModel):
     account: str
     status: str
     case_reference: str
+
+
+class LiftRestrictionRequest(BaseModel):
+    confirm: bool = Field(...)
+    resolution_note: str | None = Field(None, max_length=200)
+
+    @model_validator(mode="after")
+    def must_confirm(self):
+        if not self.confirm:
+            raise ValueError("Explicit confirmation is required (confirm=true)")
+        return self
+
+
+class LiftRestrictionResponse(BaseModel):
+    account: str
+    status: str
+    case_reference: str | None
