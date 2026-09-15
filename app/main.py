@@ -6,14 +6,10 @@ from fastapi.responses import JSONResponse
 
 from app.api import accounts, auth, conversations, health, transactions, voice
 from app.core.config import get_settings
-from app.database.base import Base
-from app.database.session import engine
-from app import models  # noqa: F401
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
     yield
 
 

@@ -18,6 +18,7 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
+alembic upgrade head
 python -m scripts.seed_database
 uvicorn app.main:app --reload
 ```
@@ -42,6 +43,15 @@ High-risk actions such as temporarily restricting an account require a second, e
 3. `POST /auth/step-up/verify` with the challenge ID and OTP.
 4. Use the returned `session_token` (a separate, elevated token) as the bearer token for the restricted endpoint.
 
+## Database migrations
+
+Schema changes are managed with [Alembic](https://alembic.sqlalchemy.org/), not `Base.metadata.create_all`. Two commands cover day-to-day use:
+
+- `alembic upgrade head` — applies any migrations that haven't been run yet against the database configured in `.env` (`DATABASE_URL`). Run this after cloning the repo, after pulling changes that include new migrations, and any time you switch onto a branch with schema changes.
+- `alembic revision --autogenerate -m "short description"` — after changing a model in `app/models/entities.py` (new table, new column, renamed column, etc.), generates a new migration file under `alembic/versions/` by diffing the models against the current database schema. Always review the generated file before committing it — autogenerate is a starting point, not a guarantee.
+
+The test suite does **not** use Alembic; `tests/conftest.py` creates and drops tables directly for speed and isolation on each test run, independent of migration state.
+
 ## Tests
 
 ```powershell
@@ -56,7 +66,7 @@ docker compose up --build
 docker compose exec api python -m scripts.seed_database
 ```
 
-PostgreSQL is used by the Compose stack. Redis is reserved for the future session abstraction and can be started with `docker compose --profile redis up`.
+PostgreSQL is used by the Compose stack. The `api` container runs `alembic upgrade head` automatically before starting `uvicorn`, so the schema is already migrated by the time `docker compose up --build` finishes starting the API — no separate migration step is needed before seeding. Redis is reserved for the future session abstraction and can be started with `docker compose --profile redis up`.
 
 ## Endpoints
 
@@ -90,8 +100,8 @@ PostgreSQL is used by the Compose stack. Redis is reserved for the future sessio
 
 ## Security and scope
 
-OTP and bearer token values are HMAC-SHA256 hashed at rest. Challenges expire, enforce retry limits, and are invalidated after use. Protected resources are queried with customer ownership predicates, and sensitive reads or mutations generate audit events. High-risk actions require both elevated authentication and explicit customer confirmation, and never mutate `Customer.status` (a reported transaction or restricted account does not automatically label the customer as a fraudster). The `/conversation/{call_id}/handoff-summary` endpoint is protected only by a shared-secret header for now, since no staff/agent identity system exists yet. The current codebase uses `create_all` for schema management with no migrations; production deployment will need Alembic migrations and managed secrets.
+OTP and bearer token values are HMAC-SHA256 hashed at rest. Challenges expire, enforce retry limits, and are invalidated after use. Protected resources are queried with customer ownership predicates, and sensitive reads or mutations generate audit events. High-risk actions require both elevated authentication and explicit customer confirmation, and never mutate `Customer.status` (a reported transaction or restricted account does not automatically label the customer as a fraudster). The `/conversation/{call_id}/handoff-summary` endpoint is protected only by a shared-secret header for now, since no staff/agent identity system exists yet. Schema management uses Alembic migrations (see "Database migrations" above); production deployment will still need managed secrets.
 
 ## Future work
 
-Real speech-to-text and text-to-speech integration (pending a decision between a hosted API and a custom-trained voice model), the Asterisk ARI/External Media telephony adapter (pending PBX access), Redis-backed session storage, rate limiting, multi-account-per-customer support in the conversation tools, and database migrations remain deliberately outside the current scope.
+Real speech-to-text and text-to-speech integration (pending a decision between a hosted API and a custom-trained voice model), the Asterisk ARI/External Media telephony adapter (pending PBX access), Redis-backed session storage, rate limiting, and multi-account-per-customer support in the conversation tools remain deliberately outside the current scope.
